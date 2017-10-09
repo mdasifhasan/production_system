@@ -84,6 +84,8 @@ class ProductionSystem:
 
     def query(self, a, b):
         print("querying spatial relation between a and b")
+        # all the rules need to be executed unless no new conditions are added in the last iteration
+        # then, the conditions should have the relation between a and b already there, just find and repot that
 
 
 if __name__ == "__main__":
