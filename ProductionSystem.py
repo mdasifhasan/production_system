@@ -25,11 +25,13 @@ class ShortTermMemory:
         self.conditions = {}
         self.dictConditions = {}
         self.dictConditionsByVars = {}
-
+        self.dictConditionsByIndVar = {}
     def addCondition(self, condition):
         if self.isConditionExists(condition):
-            print("condition exists:",condition)
+            #print("condition exists:",condition)
             return False
+
+        # map condition type to list of conditions of that type
         if condition.type not in self.conditions:
             ca = [condition]
             self.conditions[condition.type] = ca
@@ -38,6 +40,7 @@ class ShortTermMemory:
 
         self.dictConditions[self.getKeyForCondition(condition)] = condition
 
+        # map variable list to list of related conditions
         kv = self.getKeyForConditionByVars(condition)
         if kv not in self.dictConditionsByVars:
             ca = [condition]
@@ -45,6 +48,13 @@ class ShortTermMemory:
         else:
             self.dictConditionsByVars[kv].append(condition)
 
+        # map individual var to list of related conditions
+        for kv in condition.variableList:
+            if kv not in self.dictConditionsByIndVar:
+                ca = [condition]
+                self.dictConditionsByIndVar[kv] = ca
+            else:
+                self.dictConditionsByIndVar[kv].append(condition)
 
         return True
 
@@ -84,7 +94,7 @@ class Condition:
         self.type = type
         self.variableList = variableList
 
-        print("constructing condition:", self)
+        #print("constructing condition:", self)
 
     def getVariables(self):
         return self.variableList
@@ -97,7 +107,6 @@ class Condition:
 class Rule:
     def __init__(self):
         print("constructing rule")
-        self.conditions = []
 
     def process(self, stm):
         print("processing rule")
@@ -105,18 +114,78 @@ class Rule:
 class RuleLeftToRight(Rule):
     def __init__(self):
         Rule.__init__(self)
-        self.conditions.append("left of")
 
     def process(self, stm):
         Rule.process(self, stm)
         count = 0
-        for sc in self.conditions:
-            if sc in stm.conditions:
-                for c in stm.conditions[sc]:
-                    isAdded = stm.addCondition(Condition("right of", [c.variableList[1],c.variableList[0]]))
-                    if isAdded:
-                        count += 1
+        sc = "left of"
+        if sc in stm.conditions:
+            for c in stm.conditions[sc]:
+                isAdded = stm.addCondition(Condition("right of", [c.variableList[1],c.variableList[0]]))
+                if isAdded:
+                    count += 1
         return count
+
+class RuleRightToLeft(Rule):
+    def __init__(self):
+        Rule.__init__(self)
+
+    def process(self, stm):
+        Rule.process(self, stm)
+        count = 0
+        sc = "right of"
+        if sc in stm.conditions:
+            for c in stm.conditions[sc]:
+                isAdded = stm.addCondition(Condition("left of", [c.variableList[1], c.variableList[0]]))
+                if isAdded:
+                    count += 1
+        return count
+
+
+# if a is at left of b and b is at left of c then a is at left of c
+class RuleCombineLeft(Rule):
+    def __init__(self):
+        Rule.__init__(self)
+
+    def process(self, stm):
+        Rule.process(self, stm)
+        count = 0
+        sc = "left of"
+        if sc in stm.conditions:
+            for c in stm.conditions[sc]:
+                a = c.variableList[0]
+                b = c.variableList[1]
+                for cb in stm.dictConditionsByIndVar[b]:
+                    if cb.type == sc:
+                        if cb.variableList[1] == a:
+                            continue
+                        isAdded = stm.addCondition(Condition("left of", [a, cb.variableList[1]]))
+                        if isAdded:
+                            count += 1
+        return count
+
+# if a is at top of b and b is at top of c then a is at top of c
+class RuleCombineRight(Rule):
+    def __init__(self):
+        Rule.__init__(self)
+
+    def process(self, stm):
+        Rule.process(self, stm)
+        count = 0
+        sc = "right of"
+        if sc in stm.conditions:
+            for c in stm.conditions[sc]:
+                a = c.variableList[0]
+                b = c.variableList[1]
+                for cb in stm.dictConditionsByIndVar[b]:
+                    if cb.type == sc:
+                        if cb.variableList[1] == a:
+                            continue
+                        isAdded = stm.addCondition(Condition("right of", [a, cb.variableList[1]]))
+                        if isAdded:
+                            count += 1
+        return count
+
 
 # This is the core of the production system
 # It will keep a Long Term Memory a Short Term Memory
@@ -133,11 +202,14 @@ class ProductionSystem:
         # all the rules need to be executed unless no new conditions are added in the last iteration
         # then, the conditions should have the relation between a and b already there, just find and repot that
         self.ltm.process(self.stm)
-        print("All rules processed. The answer is:")
-        rk = a + "_" + b
+        print("All rules processed.")
+        self.stm.printConditions()
+        print("\nSpatial relation between", a, "and", b + ":")
+        rk = "_" + a + "_" + b
         if rk in self.stm.dictConditionsByVars:
             relations = self.stm.dictConditionsByVars[rk]
-            print(relations)
+            for r in relations:
+                print(r)
         else:
             print("I don't know!")
 
@@ -148,6 +220,7 @@ if __name__ == "__main__":
     pd.stm.printConditions()
 
     pd.ltm.addRule(RuleLeftToRight())
+    pd.ltm.addRule(RuleCombineLeft())
 
     # pd.ltm.process(pd.stm)
     # pd.stm.printConditions()
