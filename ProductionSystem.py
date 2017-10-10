@@ -1,3 +1,4 @@
+import sys
 # This will store all the rules
 class LongTermMemory:
     def __init__(self):
@@ -118,11 +119,11 @@ class Condition:
 # If yes, it will claim another set of conditions to be true and insert them within the short term memory
 class Rule:
     def __init__(self):
-        print("constructing rule")
+        # print("constructing rule")
         self.conditions = []
 
     def process(self, stm):
-        print("processing rule")
+        # print("processing rule")
         pass
 
 
@@ -211,8 +212,10 @@ class ProductionSystem:
             relations = self.stm.dictConditionsByVars[rk]
             for r in relations:
                 print(r)
+            return relations
         else:
             print("I don't know!")
+            return None
 
 
     def queryFast(self, a, b):
@@ -235,9 +238,9 @@ class ProductionSystem:
                     if c not in cl:
                         cl.append(c)
 
-            print ("Related conditions:")
-            for c in cl:
-                print(c)
+            # print ("Related conditions:")
+            # for c in cl:
+            #     print(c)
 
             # step 2:
             rulesProcessed = []
@@ -261,8 +264,10 @@ class ProductionSystem:
             relations = self.stm.dictConditionsByVars[rk]
             for r in relations:
                 print(r)
+            return relations
         else:
             print("I don't know!")
+            return None
 
 # The fork is to the left of the plate. The plate is to the left of the knife.
 def test1():
@@ -275,6 +280,8 @@ def test1():
     pd.stm.printConditions()
 
     pd.queryFast("fork", "knife")
+
+    print("\nTest 1 finished")
 
 # The fork is to the left of the plate. The plate is above the napkin
 def test2():
@@ -290,6 +297,8 @@ def test2():
 
     pd.queryFast("fork", "napkin")
 
+    print("\nTest 2 finished")
+
 
 # The fork is to the left of the plate. The spoon is to the left of the plate.
 def test3():
@@ -304,6 +313,8 @@ def test3():
     pd.stm.printConditions()
 
     pd.queryFast("fork", "spoon")
+
+    print("\nTest 3 finished")
 
 
 # The fork is to the left of the plate. The spoon is to the left of the fork. The knife is to the left
@@ -323,9 +334,28 @@ def test4():
     pd.stm.printConditions()
 
     pd.queryFast("plate", "cat")
+    print("\nTest 4 finished")
 
 # The fork is to the left of the plate. The plate is to the left of the knife.
-def testQueryFast():
+def test5():
+    pd = ProductionSystem()
+    rc = RuleCreator()
+    rc.createRules("left of", "right of", pd.ltm)
+    rc.createRules("above of", "below of", pd.ltm)
+    rc.createRules("west", "east", pd.ltm)
+    rc.createRules("south", "nort", pd.ltm)
+
+    pd.stm.addCondition(Condition("left of", ["fork","plate"]))
+    pd.stm.addCondition(Condition("left of", ["plate", "knife"]))
+    pd.stm.printConditions()
+
+    # pd.query("fork", "knife")
+    pd.queryFast("fork", "knife")
+    print("\nTest Query Fast finished")
+
+
+# The fork is to the left of the plate. The plate is to the left of the knife.
+def test6():
     pd = ProductionSystem()
     rc = RuleCreator()
     rc.createRules("left of", "right of", pd.ltm)
@@ -339,11 +369,28 @@ def testQueryFast():
     pd.stm.addCondition(Condition("left of", ["plate1", "knife1"]))
     pd.stm.addCondition(Condition("left of", ["plate2", "knife2"]))
     pd.stm.addCondition(Condition("left of", ["plate4", "knife3"]))
+
     pd.stm.printConditions()
 
     # pd.query("fork", "knife")
-    pd.queryFast("fork", "knife")
+    pd.queryFast("fork", "plate")
+    print("\nTest Query Fast finished")
 
 if __name__ == "__main__":
-    testQueryFast()
-    # test4()
+    if len(sys.argv)> 1:
+        if sys.argv[1] == "1":
+            test1()
+        elif sys.argv[1] == "2":
+            test2()
+        elif sys.argv[1] == "3":
+            test3()
+        elif sys.argv[1] == "4":
+            test4()
+        elif sys.argv[1] == "5":
+            test5()
+        elif sys.argv[1] == "6":
+            test6()
+        else:
+            test6()
+    else:
+        test6()
