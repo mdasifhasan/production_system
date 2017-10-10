@@ -3,19 +3,30 @@ class LongTermMemory:
     def __init__(self):
         print ("constructing long term memory")
         self.rules = []
+        self.dictConditionToRules = {}
 
     def addRule(self, rule):
         self.rules.append(rule)
+        # map condition type to list of related rules
+
+        for type in rule.conditions:
+            if type not in self.dictConditionToRules:
+                ca = [rule]
+                self.dictConditionToRules[type] = ca
+            else:
+                self.dictConditionToRules[type].append(rule)
 
     def process(self, stm):
         print("processing long term memory")
+        i = 0
         while True:
             count = 0
             for r in self.rules:
+                i += 1
                 count += r.process(stm)
             if count == 0:
                 break
-
+        print("Number of rules processed:", i)
 # This class will keep current conditions that are true
 # It will keep the conditions sorted by condition type in a dictionary
 # the dictionary format: conditions = <condition_type, conditions[]>
@@ -26,6 +37,7 @@ class ShortTermMemory:
         self.dictConditions = {}
         self.dictConditionsByVars = {}
         self.dictConditionsByIndVar = {}
+
     def addCondition(self, condition):
         if self.isConditionExists(condition):
             #print("condition exists:",condition)
@@ -107,16 +119,20 @@ class Condition:
 class Rule:
     def __init__(self):
         print("constructing rule")
+        self.conditions = []
 
     def process(self, stm):
         print("processing rule")
+        pass
 
 
+# if a is at left of b then b is at left of a
 class RuleAtoB(Rule):
     def __init__(self, A, B):
         Rule.__init__(self)
         self.A = A
         self.B = B
+        self.conditions = [A, B]
 
     def process(self, stm):
         Rule.process(self, stm)
@@ -135,6 +151,7 @@ class RuleCombineA(Rule):
     def __init__(self, A):
         Rule.__init__(self)
         self.A = A
+        self.conditions = [A]
 
     def process(self, stm):
         Rule.process(self, stm)
@@ -171,82 +188,6 @@ class RuleCreator():
 
         return [r1, r2, r3, r4]
 
-
-class RuleLeftToRight(Rule):
-    def __init__(self):
-        Rule.__init__(self)
-
-    def process(self, stm):
-        Rule.process(self, stm)
-        count = 0
-        sc = "left of"
-        if sc in stm.conditions:
-            for c in stm.conditions[sc]:
-                isAdded = stm.addCondition(Condition("right of", [c.variableList[1],c.variableList[0]]))
-                if isAdded:
-                    count += 1
-        return count
-
-class RuleRightToLeft(Rule):
-    def __init__(self):
-        Rule.__init__(self)
-
-    def process(self, stm):
-        Rule.process(self, stm)
-        count = 0
-        sc = "right of"
-        if sc in stm.conditions:
-            for c in stm.conditions[sc]:
-                isAdded = stm.addCondition(Condition("left of", [c.variableList[1], c.variableList[0]]))
-                if isAdded:
-                    count += 1
-        return count
-
-# if a is at left of b and b is at left of c then a is at left of c
-class RuleCombineLeft(Rule):
-    def __init__(self):
-        Rule.__init__(self)
-
-    def process(self, stm):
-        Rule.process(self, stm)
-        count = 0
-        sc = "left of"
-        if sc in stm.conditions:
-            for c in stm.conditions[sc]:
-                a = c.variableList[0]
-                b = c.variableList[1]
-                for cb in stm.dictConditionsByIndVar[b]:
-                    if cb.type == sc:
-                        if cb.variableList[1] == a:
-                            continue
-                        isAdded = stm.addCondition(Condition("left of", [a, cb.variableList[1]]))
-                        if isAdded:
-                            count += 1
-        return count
-
-# if a is at top of b and b is at top of c then a is at top of c
-class RuleCombineRight(Rule):
-    def __init__(self):
-        Rule.__init__(self)
-
-    def process(self, stm):
-        Rule.process(self, stm)
-        count = 0
-        sc = "right of"
-        if sc in stm.conditions:
-            for c in stm.conditions[sc]:
-                a = c.variableList[0]
-                b = c.variableList[1]
-                for cb in stm.dictConditionsByIndVar[b]:
-                    if cb.type == sc:
-                        if cb.variableList[1] == a:
-                            continue
-                        isAdded = stm.addCondition(Condition("right of", [a, cb.variableList[1]]))
-                        if isAdded:
-                            count += 1
-        return count
-
-
 # This is the core of the production system
 # It will keep a Long Term Memory a Short Term Memory
 # It will support functions to enter a condition to be true, new rules
@@ -273,16 +214,55 @@ class ProductionSystem:
         else:
             print("I don't know!")
 
-def test():
-    pd = ProductionSystem()
-    pd.stm.addCondition(Condition("left of", ["fork","plate"]))
-    pd.stm.addCondition(Condition("left of", ["plate", "knife"]))
-    pd.stm.printConditions()
 
-    pd.ltm.addRule(RuleLeftToRight())
-    pd.ltm.addRule(RuleCombineLeft())
+    def queryFast(self, a, b):
+        # step 1: find all the conditions related to variable a and b
+        # step 2: execute only those rules that will deal with the set of conditions selected in previous step
+        # repeat until no new conditions is added
 
-    pd.query("fork", "knife")
+        print("\n***********\nfast querying spatial relation between", a, "and", b)
+
+        i = 0
+        while True:
+            # step 1
+            cl = []
+            if a in self.stm.dictConditionsByIndVar:
+                for c in self.stm.dictConditionsByIndVar[a]:
+                    if c not in cl:
+                        cl.append(c)
+            if b in self.stm.dictConditionsByIndVar:
+                for c in self.stm.dictConditionsByIndVar[b]:
+                    if c not in cl:
+                        cl.append(c)
+
+            print ("Related conditions:")
+            for c in cl:
+                print(c)
+
+            # step 2:
+            rulesProcessed = []
+            count = 0
+            for c in cl:
+                if c.type in self.ltm.dictConditionToRules:
+                    for r in self.ltm.dictConditionToRules[c.type]:
+                        if r not in rulesProcessed:
+                            rulesProcessed.append(r)
+                            i += 1
+                            count += r.process(self.stm)
+            if count == 0:
+                break
+
+        print("Number of rules processed:", i)
+        print("Query processing finished.")
+        self.stm.printConditions()
+        print("\nSpatial relation between", a, "and", b + ":")
+        rk = "_" + a + "_" + b
+        if rk in self.stm.dictConditionsByVars:
+            relations = self.stm.dictConditionsByVars[rk]
+            for r in relations:
+                print(r)
+        else:
+            print("I don't know!")
 
 # The fork is to the left of the plate. The plate is to the left of the knife.
 def test1():
@@ -294,7 +274,7 @@ def test1():
     pd.stm.addCondition(Condition("left of", ["plate", "knife"]))
     pd.stm.printConditions()
 
-    pd.query("fork", "knife")
+    pd.queryFast("fork", "knife")
 
 # The fork is to the left of the plate. The plate is above the napkin
 def test2():
@@ -308,7 +288,7 @@ def test2():
     pd.stm.addCondition(Condition("above of", ["plate", "napkin"]))
     pd.stm.printConditions()
 
-    pd.query("fork", "napkin")
+    pd.queryFast("fork", "napkin")
 
 
 # The fork is to the left of the plate. The spoon is to the left of the plate.
@@ -323,7 +303,7 @@ def test3():
     pd.stm.addCondition(Condition("left of", ["spoon", "plate"]))
     pd.stm.printConditions()
 
-    pd.query("fork", "spoon")
+    pd.queryFast("fork", "spoon")
 
 
 # The fork is to the left of the plate. The spoon is to the left of the fork. The knife is to the left
@@ -342,7 +322,28 @@ def test4():
     pd.stm.addCondition(Condition("left of", ["cat", "pizza"]))
     pd.stm.printConditions()
 
-    pd.query("plate", "cat")
+    pd.queryFast("plate", "cat")
+
+# The fork is to the left of the plate. The plate is to the left of the knife.
+def testQueryFast():
+    pd = ProductionSystem()
+    rc = RuleCreator()
+    rc.createRules("left of", "right of", pd.ltm)
+    rc.createRules("above of", "below of", pd.ltm)
+    rc.createRules("west", "east", pd.ltm)
+    rc.createRules("south", "nort", pd.ltm)
+
+    pd.stm.addCondition(Condition("left of", ["fork","plate"]))
+    pd.stm.addCondition(Condition("left of", ["plate", "knife"]))
+    pd.stm.addCondition(Condition("left of", ["plate1", "knife1"]))
+    pd.stm.addCondition(Condition("left of", ["plate1", "knife1"]))
+    pd.stm.addCondition(Condition("left of", ["plate2", "knife2"]))
+    pd.stm.addCondition(Condition("left of", ["plate4", "knife3"]))
+    pd.stm.printConditions()
+
+    # pd.query("fork", "knife")
+    pd.queryFast("fork", "knife")
 
 if __name__ == "__main__":
-    test4()
+    testQueryFast()
+    # test4()
