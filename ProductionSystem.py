@@ -111,6 +111,67 @@ class Rule:
     def process(self, stm):
         print("processing rule")
 
+
+class RuleAtoB(Rule):
+    def __init__(self, A, B):
+        Rule.__init__(self)
+        self.A = A
+        self.B = B
+
+    def process(self, stm):
+        Rule.process(self, stm)
+        count = 0
+        sc = self.A
+        if sc in stm.conditions:
+            for c in stm.conditions[sc]:
+                isAdded = stm.addCondition(Condition(self.B, [c.variableList[1],c.variableList[0]]))
+                if isAdded:
+                    count += 1
+        return count
+
+
+# if a is at left of b and b is at left of c then a is at left of c
+class RuleCombineA(Rule):
+    def __init__(self, A):
+        Rule.__init__(self)
+        self.A = A
+
+    def process(self, stm):
+        Rule.process(self, stm)
+        count = 0
+        sc = self.A
+        if sc in stm.conditions:
+            for c in stm.conditions[sc]:
+                a = c.variableList[0]
+                b = c.variableList[1]
+                for cb in stm.dictConditionsByIndVar[b]:
+                    if cb.type == sc:
+                        if cb.variableList[1] == a:
+                            continue
+                        isAdded = stm.addCondition(Condition(self.A, [a, cb.variableList[1]]))
+                        if isAdded:
+                            count += 1
+        return count
+
+class RuleCreator():
+    def createRules(self, ruleA, ruleB, ltm = None):
+        self.ruleA = ruleA
+        self.ruleB = ruleB
+
+        r1 = RuleAtoB(ruleA, ruleB)
+        r2 = RuleAtoB(ruleB, ruleA)
+        r3 = RuleCombineA(ruleA)
+        r4 = RuleCombineA(ruleB)
+
+        if ltm != None:
+            ltm.addRule(r1)
+            ltm.addRule(r2)
+            ltm.addRule(r3)
+            ltm.addRule(r4)
+
+        return [r1, r2, r3, r4]
+
+
 class RuleLeftToRight(Rule):
     def __init__(self):
         Rule.__init__(self)
@@ -140,7 +201,6 @@ class RuleRightToLeft(Rule):
                 if isAdded:
                     count += 1
         return count
-
 
 # if a is at left of b and b is at left of c then a is at left of c
 class RuleCombineLeft(Rule):
@@ -213,7 +273,7 @@ class ProductionSystem:
         else:
             print("I don't know!")
 
-if __name__ == "__main__":
+def test():
     pd = ProductionSystem()
     pd.stm.addCondition(Condition("left of", ["fork","plate"]))
     pd.stm.addCondition(Condition("left of", ["plate", "knife"]))
@@ -222,7 +282,67 @@ if __name__ == "__main__":
     pd.ltm.addRule(RuleLeftToRight())
     pd.ltm.addRule(RuleCombineLeft())
 
-    # pd.ltm.process(pd.stm)
-    # pd.stm.printConditions()
+    pd.query("fork", "knife")
+
+# The fork is to the left of the plate. The plate is to the left of the knife.
+def test1():
+    pd = ProductionSystem()
+    rc = RuleCreator()
+    rc.createRules("left of", "right of", pd.ltm)
+
+    pd.stm.addCondition(Condition("left of", ["fork","plate"]))
+    pd.stm.addCondition(Condition("left of", ["plate", "knife"]))
+    pd.stm.printConditions()
 
     pd.query("fork", "knife")
+
+# The fork is to the left of the plate. The plate is above the napkin
+def test2():
+    pd = ProductionSystem()
+
+    rc = RuleCreator()
+    rc.createRules("left of", "right of", pd.ltm)
+    rc.createRules("above of", "below of", pd.ltm)
+
+    pd.stm.addCondition(Condition("left of", ["fork","plate"]))
+    pd.stm.addCondition(Condition("above of", ["plate", "napkin"]))
+    pd.stm.printConditions()
+
+    pd.query("fork", "napkin")
+
+
+# The fork is to the left of the plate. The spoon is to the left of the plate.
+def test3():
+    pd = ProductionSystem()
+
+    rc = RuleCreator()
+    rc.createRules("left of", "right of", pd.ltm)
+    rc.createRules("above of", "below of", pd.ltm)
+
+    pd.stm.addCondition(Condition("left of", ["fork","plate"]))
+    pd.stm.addCondition(Condition("left of", ["spoon", "plate"]))
+    pd.stm.printConditions()
+
+    pd.query("fork", "spoon")
+
+
+# The fork is to the left of the plate. The spoon is to the left of the fork. The knife is to the left
+# of the spoon. The pizza is to the left of the knife. The cat is to the left of the pizza.
+def test4():
+    pd = ProductionSystem()
+
+    rc = RuleCreator()
+    rc.createRules("left of", "right of", pd.ltm)
+    rc.createRules("above of", "below of", pd.ltm)
+
+    pd.stm.addCondition(Condition("left of", ["fork","plate"]))
+    pd.stm.addCondition(Condition("left of", ["spoon", "fork"]))
+    pd.stm.addCondition(Condition("left of", ["knife", "spoon"]))
+    pd.stm.addCondition(Condition("left of", ["pizza", "knife"]))
+    pd.stm.addCondition(Condition("left of", ["cat", "pizza"]))
+    pd.stm.printConditions()
+
+    pd.query("plate", "cat")
+
+if __name__ == "__main__":
+    test4()
